@@ -30,11 +30,12 @@ class Html2Text {
 	 * </ul>
 	 *
 	 * @param string $html the input HTML
+     * @param boolean $ignore_links Ignore links and output the text only
 	 * @param boolean $ignore_error Ignore xml parsing errors
 	 * @return string the HTML converted, as best as possible, to text
 	 * @throws Html2TextException if the HTML could not be loaded as a {@link DOMDocument}
 	 */
-	public static function convert($html, $ignore_error = false) {
+	public static function convert($html, $ignore_links = true, $ignore_error = false) {
 
 		$is_office_document = static::isOfficeDocument($html);
 
@@ -50,7 +51,7 @@ class Html2Text {
 
 		$doc = static::getDocument($html, $ignore_error);
 
-		$output = static::iterateOverNode($doc, null, false, $is_office_document);
+		$output = static::iterateOverNode($doc, null, false, $is_office_document, $ignore_links);
 
 		// process output for whitespace/newlines
 		$output = static::processWhitespaceNewlines($output);
@@ -191,7 +192,13 @@ class Html2Text {
 		return $nextName;
 	}
 
-	static function iterateOverNode($node, $prevName = null, $in_pre = false, $is_office_document = false) {
+    static function iterateOverNode(
+        $node,
+        $prevName = null,
+        $in_pre = false,
+        $is_office_document = false,
+        $ignore_links = true
+    ) {
 
 		if ($node instanceof \DOMText) {
 		  // Replace whitespace characters with a space (equivilant to \s)
@@ -391,25 +398,31 @@ class Html2Text {
 					$output = $node->getAttribute("title");
 				}
 
-				if ($href == null) {
-					// it doesn't link anywhere
-					if ($node->getAttribute("name") != null) {
-						$output = "[$output]";
-					}
-				} else {
-					if ($href == $output || $href == "mailto:$output" || $href == "http://$output" || $href == "https://$output") {
-						// link to the same address: just use link
-						$output;
-					} else {
-						// replace it
-						if ($output) {
-							$output = "[$output]($href)";
-						} else {
-							// empty string
-							$output = $href;
-						}
-					}
-				}
+                if (!$ignore_links) {
+                    if ($href == null) {
+                        // it doesn't link anywhere
+                        if ($node->getAttribute("name") != null) {
+                            $output = "[$output]";
+                        }
+                    } else {
+                        if ($href == $output ||
+                            $href == "mailto:$output" ||
+                            $href == "http://$output" ||
+                            $href == "https://$output"
+                        ) {
+                            // link to the same address: just use link
+                            $output;
+                        } else {
+                            // replace it
+                            if ($output) {
+                                $output = "[$output]($href)";
+                            } else {
+                                // empty string
+                                $output = $href;
+                            }
+                        }
+                    }
+                }
 
 				// does the next node require additional whitespace?
 				switch ($nextName) {
